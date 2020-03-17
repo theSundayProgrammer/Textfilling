@@ -36,7 +36,7 @@ int main(int argc, char* argv[]){
     std::string word;
     while(load_word(&word)==0){
         words.push_back(word);
-        word_lengths.push_back(word.length());
+        word_lengths.push_back(word.length()+1);
     }
     std::vector<int>            result;
     format_util::calculate_optimal_partition(&result,word_lengths,max_line_length,cost);
