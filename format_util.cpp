@@ -1,6 +1,7 @@
 #include "format_util.h"
 #include <cassert>
 #include <map>
+#include <iostream>
 namespace {
 	struct solution {
 		int start;
@@ -8,6 +9,7 @@ namespace {
 		solution* left;
 		solution* right;
 		double cost;
+		solution():start(-1){}
 	};
     struct context{
 		typedef std::pair<int,int> key;
@@ -15,7 +17,7 @@ namespace {
         //Data
         const std::vector<int>& word_lengths;
         int                     line_length;
-		mutable std::map<key,value> cache;
+		mutable solution *cache;
         format_util::cost_function cost;
         //ctor
         context(const std::vector<int>& word_lengths_,
@@ -23,7 +25,25 @@ namespace {
                 format_util::cost_function cost_
                 ):
         word_lengths(word_lengths_),line_length(line_length_), cost(cost_)
-        {}
+        {
+			cache = new solution[word_lengths.size()*(word_lengths.size() + 1)/2];
+		}
+		
+		~context(){ delete [] cache;}
+		int get_index(int start, int fin) const {
+			return start*(2*word_lengths.size() -start + 1) /2 + (fin - start);
+		}
+
+		solution* find(int start, int fin) const {
+			int index = get_index(start,fin);
+			if(cache[index].start == -1) return nullptr;
+			else return cache+index;
+		}
+		solution *add(solution const& sol) const {
+			int index = get_index(sol.start,sol.fin);
+			*(cache + index) = sol;
+			return cache+index;
+		}
     };
 }
 static solution* min_cost(
@@ -33,60 +53,70 @@ static solution* min_cost(
 ){
     assert(0 <= a);
     assert(a <= b);
+	//if(a==0)	std::cerr << a << "," << b << std::endl;
 
     int i=0;
-		int sum = 0;
-		auto val_ptr = context.cache.find({a,b});
-		if (val_ptr != context.cache.end()){
-			return val_ptr->second;
-		}
-		for(i=a; i<=b;++i){
-			sum += context.word_lengths[i];
-			if (sum>context.line_length) break;
-		}
-		 if(b == context.word_lengths.size() -1 && sum <= context.line_length){ // last line
-			solution *retval = new solution;
-			retval->cost = 0.0;
-			retval->left = nullptr;
-			retval->right = nullptr;
-			retval->start = a;
-			retval->fin = b;
-			context.cache.insert({{a,b},retval});
-			return retval;
-		}else if(sum <= context.line_length)	{// a to b fits line
-			solution *retval = new solution;
-			retval->cost = context.cost(context.line_length - sum);
-			retval->left = nullptr;
-			retval->right = nullptr;
-			retval->start = a;
-			retval->fin = b;
-			context.cache.insert({{a,b},retval});
-			return retval;
-		}else{ // need to break into several lines
-			solution* lowest_left=nullptr;
-			solution* lowest_right=nullptr;
-			double lowest_cost=0.0;
-			const int first = a+1;
-			
-			for(int k = first; k<=b; ++k){
-				solution* left=min_cost(a,k-1,context);
-				solution* right = min_cost(k,b,context);
-				double cost = left->cost + right->cost;
-				if(k==first || cost<lowest_cost){
-					lowest_cost = cost;
-					lowest_left = left;
-					lowest_right= right;
-				}
+	int sum = 0;
+	auto val_ptr = context.find(a,b);
+	if (val_ptr != nullptr){
+		return val_ptr;
+	}
+	for(i=a; i<=b;++i){
+		sum += context.word_lengths[i];
+		if (sum>context.line_length) break;
+	}
+	if(b == context.word_lengths.size() -1 && sum <= context.line_length){ // last line
+		solution retval;
+		retval.cost = 0.0;
+		retval.left = nullptr;
+		retval.right = nullptr;
+		retval.start = a;
+		retval.fin = b;
+		return context.add(retval);
+	
+	}else if(sum <= context.line_length)	{// a to b fits line
+		solution retval;
+		retval.cost = context.cost(context.line_length - sum);
+		retval.left = nullptr;
+		retval.right = nullptr;
+		retval.start = a;
+		retval.fin = b;
+		return context.add(retval);
+	}else if(a==b){
+		solution retval;
+		retval.cost = 0.0;
+		retval.left = nullptr;
+		retval.right = nullptr;
+		retval.start = a;
+		retval.fin = b;
+		return context.add(retval);
+
+
+	}else{ // need to break into several lines
+		solution* lowest_left=nullptr;
+		solution* lowest_right=nullptr;
+		double lowest_cost=0.0;
+		const int first = a+1;
+		
+		for(int k = first; k<=b; ++k){
+			solution* left=min_cost(a,k-1,context);
+			solution* right = min_cost(k,b,context);
+			double cost = left->cost + right->cost;
+			if(k==first || cost<lowest_cost){
+				lowest_cost = cost;
+				lowest_left = left;
+				lowest_right= right;
 			}
-			solution *retval = new solution;
-			retval->cost = lowest_cost;
-			retval->left = lowest_left;
-			retval->right = lowest_right;
-			retval->start = a;
-			retval->fin = b;
-			context.cache.insert({{a,b},retval});
-			return retval;
 		}
+		solution retval;
+		retval.cost = lowest_cost;
+		retval.left = lowest_left;
+		retval.right = lowest_right;
+		retval.start = a;
+		retval.fin = b;
+		return context.add(retval);
+		
+	}
 		
     return nullptr;
 
