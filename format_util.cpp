@@ -2,9 +2,16 @@
 #include <cassert>
 #include <map>
 namespace {
+	struct solution {
+		int start;
+		int fin;
+		solution* left;
+		solution* right;
+		double cost;
+	};
     struct context{
 		typedef std::pair<int,int> key;
-		typedef std::pair<double,std::vector<int>> value;
+		typedef solution* value;
         //Data
         const std::vector<int>& word_lengths;
         int                     line_length;
@@ -19,63 +26,81 @@ namespace {
         {}
     };
 }
-static double min_cost(
-    std::vector<int>* result,
+static solution* min_cost(
     int               a,
     int               b,
 		const context&    context
 ){
-	assert(result);
     assert(0 <= a);
     assert(a <= b);
-    double retval=0.0;
+
     int i=0;
 		int sum = 0;
 		auto val_ptr = context.cache.find({a,b});
 		if (val_ptr != context.cache.end()){
-			std::tie(retval,*result) = val_ptr->second;
-			return retval;
+			return val_ptr->second;
 		}
 		for(i=a; i<=b;++i){
 			sum += context.word_lengths[i];
 			if (sum>context.line_length) break;
 		}
 		 if(b == context.word_lengths.size() -1 && sum <= context.line_length){ // last line
-			retval = 0.0;
-			context.cache.insert({{a,b},{retval,std::vector<int>()}});
+			solution *retval = new solution;
+			retval->cost = 0.0;
+			retval->left = nullptr;
+			retval->right = nullptr;
+			retval->start = a;
+			retval->fin = b;
+			context.cache.insert({{a,b},retval});
+			return retval;
 		}else if(sum <= context.line_length)	{// a to b fits line
-			retval = context.cost(context.line_length - sum);
-			context.cache.insert({{a,b},{retval,std::vector<int>()}});
+			solution *retval = new solution;
+			retval->cost = context.cost(context.line_length - sum);
+			retval->left = nullptr;
+			retval->right = nullptr;
+			retval->start = a;
+			retval->fin = b;
+			context.cache.insert({{a,b},retval});
+			return retval;
 		}else{ // need to break into several lines
-			std::vector<int> lowest_left;
-			std::vector<int> lowest_right;
-			int lowest_k=0;
+			solution* lowest_left=nullptr;
+			solution* lowest_right=nullptr;
 			double lowest_cost=0.0;
 			const int first = a+1;
 			
 			for(int k = first; k<=b; ++k){
-				std::vector<int> left;
-				std::vector<int> right;
-				double cost = min_cost(&left,a,k-1,context)+
-				              min_cost(&right, k,b,context);
+				solution* left=min_cost(a,k-1,context);
+				solution* right = min_cost(k,b,context);
+				double cost = left->cost + right->cost;
 				if(k==first || cost<lowest_cost){
 					lowest_cost = cost;
-					lowest_k = k;
-					lowest_left.swap(left);
-					lowest_right.swap(right);
+					lowest_left = left;
+					lowest_right= right;
 				}
 			}
-			result->swap(lowest_left);
-			result->push_back(lowest_k);
-			result->insert(result->end(),lowest_right.begin(),lowest_right.end());
-			retval=lowest_cost;
-			context.cache.insert({{a,b},{retval,*result}});
+			solution *retval = new solution;
+			retval->cost = lowest_cost;
+			retval->left = lowest_left;
+			retval->right = lowest_right;
+			retval->start = a;
+			retval->fin = b;
+			context.cache.insert({{a,b},retval});
+			return retval;
 		}
 		
-    return retval;
+    return nullptr;
 
 }
+void traverse_tree(solution *sol, std::vector<int>* result)
+{
+	if (sol->left){
+		traverse_tree(sol->left,result);
+		traverse_tree(sol->right,result);
+	} else {
+		result->push_back(sol->fin);
+	}
 
+}
 void format_util::calculate_optimal_partition(
 	std::vector<int>* result,
 	const std::vector<int>& word_lengths,
@@ -85,5 +110,7 @@ void format_util::calculate_optimal_partition(
 	context context(word_lengths,line_length,cost);
 	assert(result);
 	assert(line_length > 0);
-	min_cost(result,0,word_lengths.size()-1,context);
+	solution *sol = min_cost(0,word_lengths.size()-1,context);
+	traverse_tree(sol,result);
+
 }

@@ -43,11 +43,11 @@ int main(int argc, char* argv[]){
     int start =0;
     
     for(auto fin:result){
-        for(int i=start; i<fin; ++i){
+        for(int i=start; i<=fin; ++i){
             std::cout << words[i] << ' ';
         }
         std::cout << "\n";
-        start = fin;
+        start = fin+1;
     }
     for (auto it= words.begin()+start; it!=words.end();++it){
         std::cout << *it << ' ';
