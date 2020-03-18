@@ -3,12 +3,12 @@
 #include <map>
 namespace {
     struct context{
-			  typedef std::pair<int,int> key;
-				typedef std::pair<double,std::vector<int>> value;
+		typedef std::pair<int,int> key;
+		typedef std::pair<double,std::vector<int>> value;
         //Data
         const std::vector<int>& word_lengths;
         int                     line_length;
-				mutable std::map<key,value> cache;
+		mutable std::map<key,value> cache;
         format_util::cost_function cost;
         //ctor
         context(const std::vector<int>& word_lengths_,
@@ -25,8 +25,7 @@ static double min_cost(
     int               b,
 		const context&    context
 ){
-    
-		assert(result);
+	assert(result);
     assert(0 <= a);
     assert(a <= b);
     double retval=0.0;
@@ -34,15 +33,14 @@ static double min_cost(
 		int sum = 0;
 		auto val_ptr = context.cache.find({a,b});
 		if (val_ptr != context.cache.end()){
-			*result = val_ptr->second.second;
-			retval = val_ptr->second.first;
+			std::tie(retval,*result) = val_ptr->second;
 			return retval;
 		}
 		for(i=a; i<=b;++i){
 			sum += context.word_lengths[i];
 			if (sum>context.line_length) break;
 		}
-		if(b == context.word_lengths.size() -1 && sum <= context.line_length){ // last line
+		 if(b == context.word_lengths.size() -1 && sum <= context.line_length){ // last line
 			retval = 0.0;
 			context.cache.insert({{a,b},{retval,std::vector<int>()}});
 		}else if(sum <= context.line_length)	{// a to b fits line
