@@ -3,53 +3,62 @@
 #include <map>
 #include <iostream>
 namespace {
+	typedef std::pair<int,int> index_type;
 	struct solution {
 		int start;
 		int fin;
-		solution* left;
-		solution* right;
+		index_type left;
+		index_type right;
 		double cost;
 		solution():start(-1){}
 	};
     struct context{
-		typedef std::pair<int,int> key;
-		typedef solution* value;
         //Data
         const std::vector<int>& word_lengths;
         int                     line_length;
-		mutable solution *cache;
+		typedef std::vector<solution> Solution;
+		mutable std::vector<Solution> cache;
         format_util::cost_function cost;
         //ctor
         context(const std::vector<int>& word_lengths_,
                 int                     line_length_,
                 format_util::cost_function cost_
                 ):
-        word_lengths(word_lengths_),line_length(line_length_), cost(cost_)
+        word_lengths(word_lengths_),line_length(line_length_), cost(cost_),
+		cache(word_lengths_.size())
         {
-			cache = new solution[word_lengths.size()*(word_lengths.size() + 1)/2];
+			int N=word_lengths.size();
+			for(auto& arr: cache) arr.resize(N--);
 		}
-		
-		~context(){ delete [] cache;}
-		int get_index(int start, int fin) const {
-			return start*(2*word_lengths.size() -start + 1) /2 + (fin - start);
-		}
+		 double get_cost(index_type const& index) const
+		 {
+			 return get_val(index).cost;
+		 }
+		const solution& get_val(index_type const& index) const
+		{
+			int start_, fin_;
+			std::tie(start_,fin_) = index;
+			return	cache[start_][fin_-start_];
 
-		solution* find(int start, int fin) const {
-			int index = get_index(start,fin);
-			if(cache[index].start == -1) return nullptr;
-			else return cache+index;
 		}
-		solution *add(solution const& sol) const {
-			int index = get_index(sol.start,sol.fin);
-			*(cache + index) = sol;
-			return cache+index;
+		index_type find(int start_, int fin_) const {
+			if(cache[start_][fin_-start_].start == -1) 
+				return std::make_pair(-1,-1);
+			else 
+				return std::make_pair(start_,fin_);
+		}
+		index_type add(solution const& sol) const {
+			int start_ = sol.start;
+			int fin_   = sol.fin;
+			cache[start_][fin_-start_] = sol;
+			return std::make_pair(start_,fin_);
 		}
     };
 }
-static solution* min_cost(
+index_type  min_cost(
     int               a,
     int               b,
-		const context&    context
+	const context&    context
 ){
     assert(0 <= a);
     assert(a <= b);
@@ -58,7 +67,7 @@ static solution* min_cost(
     int i=0;
 	int sum = 0;
 	auto val_ptr = context.find(a,b);
-	if (val_ptr != nullptr){
+	if (val_ptr.first != -1){
 		return val_ptr;
 	}
 	for(i=a; i<=b;++i){
@@ -68,8 +77,8 @@ static solution* min_cost(
 	if(b == context.word_lengths.size() -1 && sum <= context.line_length){ // last line
 		solution retval;
 		retval.cost = 0.0;
-		retval.left = nullptr;
-		retval.right = nullptr;
+		retval.left = std::make_pair(-1,-1);
+		retval.right = std::make_pair(-1,-1);
 		retval.start = a;
 		retval.fin = b;
 		return context.add(retval);
@@ -77,31 +86,31 @@ static solution* min_cost(
 	}else if(sum <= context.line_length)	{// a to b fits line
 		solution retval;
 		retval.cost = context.cost(context.line_length - sum);
-		retval.left = nullptr;
-		retval.right = nullptr;
+		retval.left = std::make_pair(-1,-1);
+		retval.right = std::make_pair(-1,-1);
 		retval.start = a;
 		retval.fin = b;
 		return context.add(retval);
 	}else if(a==b){
 		solution retval;
 		retval.cost = 0.0;
-		retval.left = nullptr;
-		retval.right = nullptr;
+		retval.left = std::make_pair(-1,-1);
+		retval.right = std::make_pair(-1,-1);
 		retval.start = a;
 		retval.fin = b;
 		return context.add(retval);
 
 
 	}else{ // need to break into several lines
-		solution* lowest_left=nullptr;
-		solution* lowest_right=nullptr;
+		index_type lowest_left{-1,-1};
+		index_type lowest_right{-1,-1};
 		double lowest_cost=0.0;
 		const int first = a+1;
 		
 		for(int k = first; k<=b; ++k){
-			solution* left=min_cost(a,k-1,context);
-			solution* right = min_cost(k,b,context);
-			double cost = left->cost + right->cost;
+			index_type left=min_cost(a,k-1,context);
+			index_type right = min_cost(k,b,context);
+			double cost = context.get_cost(left)+ context.get_cost(right);
 			if(k==first || cost<lowest_cost){
 				lowest_cost = cost;
 				lowest_left = left;
@@ -118,16 +127,16 @@ static solution* min_cost(
 		
 	}
 		
-    return nullptr;
+    return std::make_pair(-1,-1);
 
 }
-void traverse_tree(solution *sol, std::vector<int>* result)
+void traverse_tree(context const& context_, solution const& sol, std::vector<int>* result)
 {
-	if (sol->left){
-		traverse_tree(sol->left,result);
-		traverse_tree(sol->right,result);
+	if (sol.left.first!=-1){
+		traverse_tree(context_, context_.get_val(sol.left),result);
+		traverse_tree(context_, context_.get_val(sol.right),result);
 	} else {
-		result->push_back(sol->fin);
+		result->push_back(sol.fin);
 	}
 
 }
@@ -140,7 +149,7 @@ void format_util::calculate_optimal_partition(
 	context context(word_lengths,line_length,cost);
 	assert(result);
 	assert(line_length > 0);
-	solution *sol = min_cost(0,word_lengths.size()-1,context);
-	traverse_tree(sol,result);
+	auto index = min_cost(0,word_lengths.size()-1,context);
+	traverse_tree(context, context.get_val(index),result);
 
 }
