@@ -27,7 +27,7 @@ static double min_cost(
 ){
 	assert(result);
     assert(0 <= a);
-    assert(a <= b);
+    assert(a < b);
     double retval=0.0;
     int i=0;
 		int sum = 0;
@@ -36,15 +36,18 @@ static double min_cost(
 			std::tie(retval,*result) = val_ptr->second;
 			return retval;
 		}
-		for(i=a; i<=b;++i){
+		for(i=a; i<b;++i){
 			sum += context.word_lengths[i];
 			if (sum>context.line_length) break;
 		}
-		 if(b == context.word_lengths.size() -1 && sum <= context.line_length){ // last line
+		if(b == context.word_lengths.size() && sum <= context.line_length){ // last line
 			retval = 0.0;
 			context.cache.insert({{a,b},{retval,std::vector<int>()}});
 		}else if(sum <= context.line_length)	{// a to b fits line
 			retval = context.cost(context.line_length - sum);
+			context.cache.insert({{a,b},{retval,std::vector<int>()}});
+		}else if (b-a ==1){ //if one word is longer than max string length
+			retval = 0;
 			context.cache.insert({{a,b},{retval,std::vector<int>()}});
 		}else{ // need to break into several lines
 			std::vector<int> lowest_left;
@@ -53,10 +56,10 @@ static double min_cost(
 			double lowest_cost=0.0;
 			const int first = a+1;
 			
-			for(int k = first; k<=b; ++k){
+			for(int k = first; k<b; ++k){
 				std::vector<int> left;
 				std::vector<int> right;
-				double cost = min_cost(&left,a,k-1,context)+
+				double cost = min_cost(&left,a,k,context)+
 				              min_cost(&right, k,b,context);
 				if(k==first || cost<lowest_cost){
 					lowest_cost = cost;
@@ -85,5 +88,5 @@ void format_util::calculate_optimal_partition(
 	context context(word_lengths,line_length,cost);
 	assert(result);
 	assert(line_length > 0);
-	min_cost(result,0,word_lengths.size()-1,context);
+	min_cost(result,0,word_lengths.size(),context);
 }
