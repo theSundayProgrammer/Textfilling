@@ -11,13 +11,16 @@ namespace {
 		index_type right;
 		double cost;
 		solution():start(-1){}
+		bool is_leaf() const{
+			return left.first == -1;
+		}
 	};
     struct context{
         //Data
         const std::vector<int>& word_lengths;
         int                     line_length;
-		typedef std::vector<solution> Solution;
-		mutable std::vector<Solution> cache;
+		typedef std::vector<solution> solution_type;
+		mutable std::vector<solution_type> cache;
         format_util::cost_function cost;
         //ctor
         context(const std::vector<int>& word_lengths_,
@@ -53,6 +56,7 @@ namespace {
 			cache[start_][fin_-start_] = sol;
 			return std::make_pair(start_,fin_);
 		}
+		
     };
 }
 index_type  min_cost(
@@ -62,15 +66,13 @@ index_type  min_cost(
 ){
     assert(0 <= a);
     assert(a <= b);
-	//if(a==0)	std::cerr << a << "," << b << std::endl;
 
-    int i=0;
 	int sum = 0;
 	auto val_ptr = context.find(a,b);
 	if (val_ptr.first != -1){
 		return val_ptr;
 	}
-	for(i=a; i<=b;++i){
+	for(int i=a; i<=b;++i){
 		sum += context.word_lengths[i];
 		if (sum>context.line_length) break;
 	}
@@ -130,9 +132,8 @@ index_type  min_cost(
     return std::make_pair(-1,-1);
 
 }
-void traverse_tree(context const& context_, solution const& sol, std::vector<int>* result)
-{
-	if (sol.left.first!=-1){
+void traverse_tree(context const& context_, solution const& sol, std::vector<int>* result){
+	if (!sol.is_leaf()){
 		traverse_tree(context_, context_.get_val(sol.left),result);
 		traverse_tree(context_, context_.get_val(sol.right),result);
 	} else {
